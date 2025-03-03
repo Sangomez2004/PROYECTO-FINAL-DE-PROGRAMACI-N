@@ -1,0 +1,137 @@
+import pygame
+import sys
+import random
+
+# Definir colores en formato RGB
+WHITE = (255, 255, 255)  # Blanco para el fondo del tablero
+BLACK = (0, 0, 0)  # Negro para los bordes
+RED = (200, 0, 0)  # Rojo para una de las zonas de salida
+LIGHT_RED = (255, 100, 100)  # Rojo claro para las fichas rojas
+GREEN = (0, 150, 0)  # Verde para una de las zonas de salida
+LIGHT_GREEN = (100, 255, 100)  # Verde claro para las fichas verdes
+BLUE = (0, 0, 200)  # Azul para una de las zonas de salida
+LIGHT_BLUE = (100, 100, 255)  # Azul claro para las fichas azules
+YELLOW = (200, 200, 0)  # Amarillo para una de las zonas de salida
+LIGHT_YELLOW = (255, 255, 100)  # Amarillo claro para las fichas amarillas
+
+# Configuración del tablero
+tile_size = 40  # Tamaño de cada casilla en píxeles
+board_size = tile_size * 15  # Tamaño total del tablero en píxeles (15x15 casillas)
+
+# Inicializar pygame
+pygame.init()
+screen = pygame.display.set_mode((board_size, board_size))  # Crear la ventana del juego
+pygame.display.set_caption("Tablero de Parqués")  # Título de la ventana
+font = pygame.font.Font(None, 36)  # Fuente para los textos en pantalla
+
+# Representación de fichas y casillas
+NUM_CASILLAS_EXTERNAS = 68  # Número de casillas en el recorrido externo
+NUM_CASILLAS_INTERNAS = 8  # Número de casillas en la recta final de cada color
+
+# Posiciones iniciales de las fichas en sus respectivas zonas de salida
+START_POSITIONS = {
+    "RED": [(2, 2), (3, 2), (2, 3), (3, 3)],
+    "BLUE": [(11, 2), (12, 2), (11, 3), (12, 3)],
+    "GREEN": [(11, 11), (12, 11), (11, 12), (12, 12)],
+    "YELLOW": [(2, 11), (3, 11), (2, 12), (3, 12)]
+}
+
+# Mapeo de colores para las fichas
+COLOR_MAP = {"RED": LIGHT_RED, "BLUE": LIGHT_BLUE, "GREEN": LIGHT_GREEN, "YELLOW": LIGHT_YELLOW}
+
+# Lista de recorrido del tablero
+RECORRIDO = [
+    # Casillas externas del tablero
+    (6, 0), (6, 1), (6, 2), (6, 3), (6, 4), (6, 5), (5, 6), (4, 6), (3, 6), (2, 6), (1, 6), (0, 6),
+    (0, 7), (0, 8), (1, 8), (2, 8), (3, 8), (4, 8), (5, 8), (6, 9), (6, 10), (6, 11), (6, 12), (6, 13), (6, 14),
+    # Casillas internas (meta)
+    (7, 7), (7, 8), (8, 7), (8, 8), (7, 6), (7, 9), (6, 7), (6, 8)
+]
+
+# Clase que representa una ficha en el juego
+class Ficha:
+    def __init__(self, color, idx):
+        self.color = color  # Color de la ficha
+        self.position = None  # Indica si la ficha está en la cárcel
+        self.start_position = START_POSITIONS[color][idx]  # Posición inicial en la cárcel
+        self.en_juego = False  # Indica si la ficha ya está en juego
+
+    def mover(self, pasos):
+        """Mueve la ficha una cantidad de pasos en el recorrido"""
+        if self.position is None:
+            return False  # No se puede mover si está en la cárcel
+        
+        nueva_posicion = self.position + pasos  # Nueva posición tras el movimiento
+        if nueva_posicion >= len(RECORRIDO):
+            nueva_posicion = len(RECORRIDO) - 1  # Limitar la posición a la última casilla válida
+        
+        self.position = nueva_posicion
+        return True
+
+    def sacar_de_la_carcel(self):
+        """Saca la ficha de la cárcel cuando se obtiene un 5 en los dados"""
+        if self.position is None:
+            self.position = 0  # Se coloca en la primera casilla de su recorrido
+            self.en_juego = True
+            return True
+        return False
+
+# Función para lanzar los dados
+def roll_dice():
+    return random.randint(1, 6), random.randint(1, 6)
+
+# Dibujar el tablero y las fichas en pantalla
+def draw_board(fichas, dice_values, turno):
+    screen.fill(WHITE)  # Fondo blanco
+    
+    # Dibujar el tablero con sus casillas
+    for row in range(15):
+        for col in range(15):
+            rect = pygame.Rect(col * tile_size, row * tile_size, tile_size, tile_size)
+            pygame.draw.rect(screen, BLACK, rect, 1)  # Bordes de las casillas
+            
+            # Colorear las zonas de salida
+            if (row, col) in START_POSITIONS["RED"]:
+                pygame.draw.rect(screen, RED, rect)
+            elif (row, col) in START_POSITIONS["BLUE"]:
+                pygame.draw.rect(screen, BLUE, rect)
+            elif (row, col) in START_POSITIONS["GREEN"]:
+                pygame.draw.rect(screen, GREEN, rect)
+            elif (row, col) in START_POSITIONS["YELLOW"]:
+                pygame.draw.rect(screen, YELLOW, rect)
+    
+    # Dibujar las fichas en sus posiciones
+    for color, fichas_equipo in fichas.items():
+        for ficha in fichas_equipo:
+            if ficha.position is not None:
+                row, col = RECORRIDO[ficha.position]
+            else:
+                row, col = ficha.start_position
+            pygame.draw.circle(screen, COLOR_MAP[color], (col * tile_size + tile_size // 2, row * tile_size + tile_size // 2), tile_size // 3)
+    
+    # Mostrar valores de los dados y el turno actual
+    dice_text = font.render(f"Dados: {dice_values[0]} - {dice_values[1]}", True, BLACK)
+    screen.blit(dice_text, (10, board_size - 50))
+    turno_text = font.render(f"Turno: {turno}", True, BLACK)
+    screen.blit(turno_text, (200, board_size - 50))
+
+# Bucle principal del juego
+def main():
+    """Inicializa el juego y ejecuta el bucle principal"""
+    fichas = {
+        "RED": [Ficha("RED", i) for i in range(4)],
+        "BLUE": [Ficha("BLUE", i) for i in range(4)],
+        "GREEN": [Ficha("GREEN", i) for i in range(4)],
+        "YELLOW": [Ficha("YELLOW", i) for i in range(4)]
+    }
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+        pygame.display.flip()
+    pygame.quit()
+    sys.exit()
+
+if __name__ == "__main__":
+    main()
